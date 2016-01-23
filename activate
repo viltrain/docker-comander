@@ -1,0 +1,35 @@
+
+function gitlab_up() {
+  sudo mkdir -p /srv/docker/gitlab/gitlab
+  sudo chmod 777 /srv/docker/gitlab/gitlab
+  
+  docker run --name gitlab-postgresql -d \
+    --env 'DB_NAME=gitlabhq_production' \
+    --env 'DB_USER=gitlab' --env 'DB_PASS=password' \
+    sameersbn/postgresql:9.4-12
+    
+  docker run --name gitlab-redis -d sameersbn/redis:latest
+  
+  docker run --name gitlab -d \
+    --link gitlab-postgresql:postgresql --link gitlab-redis:redisio \
+    --publish 10022:22 --publish 10080:80 \
+    --env 'GITLAB_PORT=10080' --env 'GITLAB_SSH_PORT=10022' \
+    --env 'GITLAB_SECRETS_DB_KEY_BASE=7mvVkWjcKLHjtqkWR9rFmCh3jMMRChszkbzHHXN4R3vChddPqczKLxrNrkj9qHsW' \
+    --env "GITLAB_HOST=$1"
+    --volume /srv/docker/gitlab/gitlab:/home/git/data \
+    sameersbn/gitlab:8.3.4-2
+}
+
+function dc_up() {
+  docker build -t viltrain/docker-commander . && docker run --name dc --rm -e "URL=$1" -e "TOKEN=$2" -p 5000:5000 -v /var/run/docker.sock:/var/run/docker.sock viltrain/docker-commander
+}
+
+function dc_watch() {
+  while true; do inotifywait -e modify app.py; docker cp app.py dc:/app; done
+}
+
+function builder_build() {
+  cd builder
+  docker build -t gitlab.mdcpartners.be/generic_plan_builder:latest .
+  cd ..
+}
